@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+        <style>
+    .button {
+  display: inline-block;
+  border-radius: 4px;
+  background-color: #f4511e;
+  border: none;
+  color: #FFFFFF;
+  text-align: center;
+  font-size: 14px;
+  padding: 10px;
+  width: 140px;
+  transition: all 0.5s;
+  cursor: pointer;
+  margin: 5px;
+}
+
+.button span {
+  cursor: pointer;
+  display: inline-block;
+  position: relative;
+  transition: 0.5s;
+}
+
+.button span:after {
+  content: '\00bb';
+  position: absolute;
+  opacity: 0;
+  top: 0;
+  right: -20px;
+  transition: 0.5s;
+}
+
+.button:hover span {
+  padding-right: 25px;
+}
+
+.button:hover span:after {
+  opacity: 1;
+  right: 0;
+}
+
+.gray {
+  background-color: gray;
+}
+
+.slidecontainer {
+  width: 100%;
+}
+
+.slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: #d3d3d3;
+  outline: none;
+  opacity: 0.7;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+
+.slider:hover {
+  opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: blue;
+  cursor: pointer;
+}
+.p {
+font-family: Colfax,Helvetica,sans-serif;
+}
+.submit-button-container {
+padding-top: 15px;
+}
+
+
+input[type=text], select {
+  width: 100%;
+  padding: 12px 20px;
+  margin: 8px 0;
+  display: inline-block;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.input-container {
+  padding-left: 5px;
+}
+
+/* Add a right margin to each icon */
+.fa {
+  margin-left: -12px;
+  margin-right: 8px;
+}
+</style>
+  </head>
+  <body>
+        <div class="block" id="button-bar">
+          <div class="slidecontainer">
+            <p>Creativity:  <span id="demo"></span></p>
+            <input type="range" min="1" max="100" value="50" class="slider" id="myRange">
+          </div>
+        <div class = "submit-button-container">
+          <button id = "insert-text" class="button" style="vertical-align:middle"><i id="loader1"></i><span>Generate </span></button>
+          <div id = "first"></div>
+          <div id = "second"></div>
+          <div id = "third"></div>
+        </div>
+        <div class = "input-container">
+            <input type="text" name="style" id="styleInput" value="formal" />
+        </div>
+           <button id = "insert-style-text" class="button" style="vertical-align:middle"><i id = "loader2"></i><span>Change Style</span></button>
+        </div>
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script>
+//slider value change
+        var token = `Bearer OPENAI_SECRET_KEY`;
+        var slider = document.getElementById("myRange");
+        var output = document.getElementById("demo");
+        output.innerHTML = slider.value;
+
+        slider.oninput = function() {
+        output.innerHTML = this.value;
+}
+//      var allBodyText = "not right";
+      /**
+       * On document load, assign click handlers to each button and try to load the
+       * user's origin and destination language preferences if previously set.
+       */
+      $(function() {
+        $('#insert-text').click(getAllBody);
+      });
+      $('#insert-text').click(function(){
+       if(!$("#loader1").hasClass("fa fa-refresh fa-spin"))
+            $("#loader1").addClass("fa fa-refresh fa-spin");
+          if(!$(this).hasClass('gray'))
+          $(this).addClass('gray');
+});
+      $(function() {
+        $('#insert-style-text').click(getSelectedText);
+      });
+      
+            $('#insert-style-text').click(function(){
+            if(!$("#loader2").hasClass("fa fa-refresh fa-spin"))
+            $("#loader2").addClass("fa fa-refresh fa-spin");
+          if(!$(this).hasClass('gray'))
+          $(this).addClass('gray');
+});
+//      function insertTextAndChange(){
+//        getAllBody();
+//      }
+        
+      /**
+       * Runs a server-side function to insert the translated text into the document
+       * at the user's cursor or selection.
+       */
+       
+      async function insertText(allOfBody) {
+        
+        this.disabled = true;
+        $('#error').remove();
+        let finishedThought = await finishMyThought(allOfBody);
+        $("#insert-text").removeClass("gray");
+        $("#loader1").removeClass("fa fa-refresh fa-spin");
+        google.script.run
+            .withSuccessHandler(
+              function(returnSuccess, element) {
+                element.disabled = false;
+              })
+            .withFailureHandler(
+              function(msg, element) {
+                showError(msg, $('#button-bar'));
+                element.diabled = false;
+              })
+            .withUserObject(this)
+            .insertText(finishedThought+'.');
+      }
+      
+      
+     async function insertStyleText(selectedText) {
+        
+        this.disabled = true;
+        $('#error').remove();
+        let restyledText = await changeStyle(selectedText);
+        $("#insert-style-text").removeClass("gray");
+        $("#loader2").removeClass("fa fa-refresh fa-spin");
+        if (restyledText.length<6) {
+          restyledText = selectedText;
+        }
+        google.script.run
+            .withSuccessHandler(
+              function(returnSuccess, element) {
+                element.disabled = false;
+              })
+            .withFailureHandler(
+              function(msg, element) {
+                showError(msg, $('#button-bar'));
+                element.diabled = false;
+              })
+            .withUserObject(this)
+            .insertStyleText(restyledText);
+      }
+
+      /**
+       * Inserts a div that contains an error message after a given element.
+       *
+       * @param {string} msg The error message to display.
+       * @param {DOMElement} element The element after which to display the error.
+       */
+      function showError(msg, element) {
+        var div = $('<div id="error" class="error">' + msg + '</div>');
+        $(element).after(div);
+      }
+//      const getAllBody = func => 
+//          new Promise(resolve=>
+//          google.script.run.withSuccessHandler(onSuccess)
+//          .getBodyText();
+//          );
+      function getAllBody(){
+          google.script.run.withSuccessHandler(insertText)
+          .getBodyText();
+         }
+      function getSelectedText(){
+          google.script.run.withSuccessHandler(insertStyleText)
+          .getSelectedText();
+         }
+         
+         
+        const finishMyThought = async (english) => {
+        if (english == "") {
+          return "";
+        }
+        var slider = document.getElementById("myRange");
+        temperature = parseFloat((slider.value/100).toFixed(2));
+        console.log(temperature);
+        const resp = await fetch(
+          "https://api.openai.com/v1/engines/davinci/completions",
+          {
+            body: JSON.stringify({
+              prompt:`${english}`,
+              max_tokens: 50,
+              temperature: temperature,
+              frequency_penalty: 0.49,
+              presence_penalty: .51,
+              best_of:1,
+              n: 1,
+              stream: false,
+              stop: ["."],
+            }),
+            method: "POST",
+            headers: {
+              Authorization: token,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        const rbody = await resp.json();
+        if (rbody.error) {
+          return null;
+        }
+//        var one = document.getElementById('one');
+//        var two = document.getElementById('two');
+//        var three = document.getElementById('three');
+//        one.innerHTML = rbody.choices[0].text;
+//        two.innerHTML = rbody.choices[1].text;
+//        three.innerHTML = rbody.choices[2].text;
+        return rbody.choices[0].text;
+      };
+      
+      
+      const changeStyle = async (english) => {
+        if (english == "") {
+          return "";
+        }
+        var styleInput = document.getElementById("styleInput").value;
+//        lengthResponse = styleInput.split(' ').length + 200;
+        const resp = await fetch(
+          "https://api.openai.com/v1/engines/davinci/completions",
+          {
+            body: JSON.stringify({
+              prompt: "My friend told me to rewrite this text because it needs to be more romantic:\n\n\"\"\"\n\nI love you so much, I would do anything for you\n\n\"\"\"\n\nI rewrote it, in more romantic language:\n\n\"\"\"\n\nThe way I feel for you cannot be described in words. My flower, I would lay down my life to protect you from even the most trivial injustice.\n\n###\n\nMy friend told me to rewrite this text because it needs to be more formal:\n\n\"\"\"\n\nI decided to write an extended essay on how hip-hop works as protest of the lower classes because I think the music is cool and really gets people dancing, inspiring those people who wouldn’t normally think there’s any point in being against anything to listen to the message. Being an enthusiastic hip-hop dancer myself, I really wanted to find out some more about this.\n\n\"\"\"\n\nI rewrote it, in more formal language:\n\n\"\"\"\n\nThis extended essay on how the lyrics of hip-hop developed as a form of protest against a society segregating the working classes is based on the premise of the music having a distinct and energizing rhythm that really inspires people to move, thereby reaching out to audiences who wouldn’t normally believe in protest, let alone speak out in public. Thus, the music becomes a vehicle for words of protest that can and indeed have changed the world. My own experience with dancing hip-hop at a relatively advanced and skilled level fueled my desire to research this topic in more depth.\n\n###\n\nMy friend told me to rewrite this text because it needs to be more friendly:\n\n\"\"\"\n\nDear Alex, \n\nI hope you are well. I would like to invite you to a soirée this evening. Please inform me if you are available.\n\n\"\"\"\n\nI rewrote it, in more friendly language:\n\n\"\"\"\n\nHey Alex! I'm having a party tonight. Wanna come? Please let me know if you can make it!\n\n###\n\nMy friend told me to rewrite this text because it needs to be less complicated:\n\n\"\"\"\n\nOvernight trading for the NYSE Index futures was a bit volatile, dropping by about 3% to the downside before moving sharply back to the upside. Gold futures were unchanged and the E-mini NASDAQ 100 futures remained near unchanged. The yield on the 10-year Treasury bond finished unchanged from its close of 2.45% earlier today.\n\n\"\"\"\n\nI rewrote it, in less complicated language:\n\n\"\"\"\n\nThe market went down a bit, then went back up. The price of gold and the NASDAQ didn't change much. The return on the 10-year Treasury bond din't change.\n\n###\n\nMy friend told me to rewrite this text because it wasn't "+styleInput+" enough:\n\n\"\"\"\n\n"+english+"\n\n\"\"\"\n\nI rewrote it, in more "+ styleInput+ " language:\n\n\"\"\"\n",
+              temperature: 0.55,
+              max_tokens: 250,
+              top_p: 1,
+              stop:["###","\"\"\""],
+              presence_penalty: 1,
+              best_of:1,
+              n: 1,
+              stream: false,
+              logprobs: null,
+            }),
+            method: "POST",
+            headers: {
+              Authorization: token,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        const rbody = await resp.json();
+        if (rbody.error) {
+          return null;
+        }
+        return rbody.choices[0].text.trim();
+      };
+    </script>
+  </body>
+</html>
